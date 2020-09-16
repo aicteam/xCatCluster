@@ -1,0 +1,54 @@
+#!/bin/bash
+
+#we should put freeipa client installtion there
+#yum install ipa
+#ipa-client-install
+#we are not sure of these
+
+
+export MUNGEUSER=1001
+groupadd -g $MUNGEUSER munge
+useradd  -m -c "MUNGE Uid 'N' Gid Emporium" -d /var/lib/munge -u $MUNGEUSER -g munge  -s /sbin/nologin munge
+export SlurmUSER=1002
+groupadd -g $SlurmUSER slurm
+useradd  -m -c "Slurm workload manager" -d /var/lib/slurm -u $SlurmUSER -g slurm  -s /bin/bash slurm
+
+#munge authentication
+
+yum install -y munge munge-libs munge-devel
+
+chown munge: /etc/munge/munge.key
+chmod 400 /etc/munge/munge.key
+
+chown -R munge: /etc/munge/ /var/log/munge/ /var/lib/munge/ /run/munge/
+chmod 0700 /etc/munge/ /var/log/munge/ /var/lib/munge/ /run/munge/
+
+
+
+systemctl enable munge
+
+
+
+
+#slurm installation
+
+mkdir /var/log/slurm
+mkdir /var/run/slurm
+mkdir /var/spool/slurm
+chown -R slurm:slurm /var/log/slurm
+chown -R slurm:slurm /var/run/slurm
+chown -R slurm:slurm /var/spool/slurm
+chown -R slurm:slurm /etc/slurm
+
+yum install -y slurm slurm-slurmd
+
+systemctl enable slurmd
+systemctl start slurmd
+
+
+mkdir /var/spool/slurmd
+chown slurm: /var/spool/slurmd
+chmod 755 /var/spool/slurmd
+mkdir /var/log/slurm/
+touch /var/log/slurm/slurmd.log
+chown -R slurm:slurm /var/log/slurm/slurmd.log

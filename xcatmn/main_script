@@ -1,0 +1,11 @@
+#!/bin/bash
+# WARNING: SHOULD BE RUN BY ROOT
+
+
+
+# SLURM
+
+
+
+# BEEGFS
+./mgmt_beegfs_script

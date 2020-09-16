@@ -1,0 +1,65 @@
+#!/bin/bash
+
+# WARNING: THIS SCRIPT IS ASSUMED TO BE RAN ON JUST ONE XCAT MANAGEMENT NODE
+# OR IT NEEDS TO BE UPDATED TO RUN ON MULTIPLE XCATMN NODES
+
+
+# BeeGFS xcat-based
+wget -O /etc/yum.repos.d/beegfs_rhel7.repo https://www.beegfs.io/release/latest-stable/dists/beegfs-rhel7.repo
+
+
+mkdir /install/beegfs/
+cd /install/beegfs/
+yum install -y --downloadonly --downloaddir=. beegfs-mgmtd beegfs-meta beegfs-storage beegfs-client beegfs-helperd beegfs-utils
+createrepo .
+
+# Remove the services you do not want
+yum install -y beegfs-mgmtd beegfs-meta  beegfs-storage beegfs-client beegfs-helperd beegfs-utils
+
+
+
+# SHOULD CUSTOMIZED BASED ON XCAT MANAGEMENT NODE NAME
+mgmt_server_name=xcatmn
+id=1
+
+
+# BeeGFS services configuration
+# Management service configuration 
+
+/opt/beegfs/sbin/beegfs-setup-mgmtd -p /data/beegfs/beegfs_mgmtd
+
+# Metadata service configuration
+
+/opt/beegfs/sbin/beegfs-setup-meta -p /data/beegfs/beegfs_meta -s $id -m $mgmt_server_name
+
+# Storage service configuration 
+
+# repeat this command in case of other storage targets
+target=01
+storage_target=$id$target
+storage_dir=/data/beegfs/beegfs_storage # COULD BE RAID
+/opt/beegfs/sbin/beegfs-setup-storage -p $storage_dir -s $id -i $storage_target -m $mgmt_server_name
+
+
+# Client service configuration
+
+/opt/beegfs/sbin/beegfs-setup-client -m $mgmt_server_name
+
+
+# Service startup
+
+systemctl start beegfs-mgmtd beegfs-meta beegfs-storage beegfs-client beegfs-helperd beegfs-utils
+systemctl status beegfs-mgmtd beegfs-meta beegfs-storage beegfs-client beegfs-helperd beegfs-utils
+
+
+node_list=cn1 # Can be regex
+postscripts_dir=/install/postscripts/
+computing_nodes_script_name=install_beegfs_on_computing
+computing_nodes_script=${postscripts_dir}${computing_nodes_script_name}
+echo $computing_nodes_script
+if [[ -f "$computing_nodes_script" ]]; then
+	updatenode $node_list -P $computing_nodes_script_name
+else
+	echo "$computing_nodes_script_name not found! Please add it to $postscripts_dir directory"
+fi
+

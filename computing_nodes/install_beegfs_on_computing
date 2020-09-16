@@ -1,0 +1,89 @@
+#!/bin/bash
+# CENTOS-7 VERSION
+# WARNING: THIS SCRIPT ASSUMES THAT XCATMN DEVICE WILL TAKE ID=1 AND ALL COMPUTING NODES WILL
+# 	TAKE ID=2,3, ...
+# IT WILL ALSO ASSUME THAT COMPUTING NODES ARE NAMED LIKE: cnK, where K is a positive integer that describes the node number. E.g. cn1, cn2, ...
+
+
+yum clean all
+yum update -y && yum upgrade
+
+
+# EDITABLE VARIABLES
+mgmt_nodename=xcatmn
+
+
+
+# configure the repo location to be the management node
+mgmt_hostname=${mgmt_nodename}.cluster.com
+beegfs=/etc/yum.repos.d/beegfs.repo	
+cat > $beegfs << EOF
+[beegfs]
+name=BeeGFS
+baseurl=http://${mgmt_hostname}:80//install/beegfs/
+enabled=1
+gpgcheck=0
+EOF
+
+
+# INSTALL BEEGFS SERVICES
+
+yum install beegfs-meta beegfs-storage beegfs-client beegfs-helperd beegfs-utils -y
+
+
+# BASIC CONFIGURATION
+
+# metadata service config
+
+#this must be automatic based on the machine
+hostname=$(hostname -a)
+meta_id=${hostname:2}
+id=$(($meta_id + 1))
+
+/opt/beegfs/sbin/beegfs-setup-meta -p /data/beegfs/beegfs_meta -s $id -m $mgmt_nodename
+
+
+# storage service config
+target=01
+id_target=$id$target
+/opt/beegfs/sbin/beegfs-setup-storage -p /data/beegfs/beegfs_storage -s $id -i $id_target -m $mgmt_nodename
+
+
+# client
+# client needs to know where the mgmt service is running
+yum install kernel-devel gcc -y
+
+/etc/init.d/beegfs-client rebuild
+
+/opt/beegfs/sbin/beegfs-setup-client -m $mgmt_nodename
+
+
+
+
+# SERVICE STARTUP
+
+systemctl start beegfs-meta
+systemctl start beegfs-storage
+systemctl start beegfs-helperd
+
+#configure /etc/beegfs/beegfs-client.conf sysMountSanityCheckMS=0
+client_conf=/etc/beegfs/beegfs-client.conf
+while read a; do 
+	first_char=${a:0:1}
+	if [[ $first_char == "#" ]]; then
+		echo $a
+	else 
+		echo ${a//11000/0}
+	fi
+done < $client_conf > ${client_conf}.t
+mv $client_conf{.t,}
+
+
+
+systemctl start beegfs-client
+
+
+
+systemctl status beegfs-meta beegfs-storage beegfs-helperd beegfs-client
+
+
